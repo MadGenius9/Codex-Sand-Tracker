@@ -1,5 +1,7 @@
 # Sand Pad
 
+Customer pull orders in Setup save a draw strategy or custom sequence of up to six actual silo numbers for each customer on the pad. The next well's customer selects the rule (case-insensitive), falling back to the pad customer for blank wells, then the pad strategy when no rule exists. Manual pins still take priority. Custom orders skip offline/removed tanks and filter by mesh; unlisted tanks follow rotation. Selecting a different well or stage in Record run previews its own customer plan without changing the saved job cursor. Copying pad setup includes customer orders.
+
 A local frac-sand pad tracker. The yard is the primary surface: select a steel silo to inspect its balance or work with tickets and stage pulls.
 
 ## Run

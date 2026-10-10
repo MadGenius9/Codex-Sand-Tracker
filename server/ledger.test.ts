@@ -8,6 +8,7 @@ import { openStore, snapshot } from "./store";
 import { createApp } from "./app";
 import { migrate } from "./migrate";
 import { migrateJob } from "./job-migrate";
+import { migrateCustomerOrders } from "./customer-orders";
 
 test("legacy migration preserves ledger IDs, balances and undated runs; reopening never reseeds", () => {
   const dir = mkdtempSync(join(tmpdir(), "sand-pad-migration-")),
@@ -22,6 +23,7 @@ test("legacy migration preserves ledger IDs, balances and undated runs; reopenin
  CREATE TABLE settings(id INTEGER PRIMARY KEY,reserve REAL,strategy TEXT); INSERT INTO settings VALUES(1,4,'sequential');`);
     migrate(db, false);
     migrateJob(db);
+    migrateCustomerOrders(db);
     const p = snapshot(db);
     assert.equal(p.silos[0].on_hand, 1500);
     assert.equal(p.deliveries[0].id, 21);

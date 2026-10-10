@@ -3,6 +3,7 @@ import type { Pad } from "./types";
 import { request } from "./api";
 import { pounds } from "./Yard";
 import { NewPad, ProductMap, DatabaseDownload, Suppliers } from "./PadTools";
+import CustomerOrders from "./CustomerOrders";
 type Entity = "wells" | "sand_types" | "silos";
 type Draft = { id?: number; [key: string]: any };
 function Editor({
@@ -560,6 +561,7 @@ export default function Setup({
           onSave={(p) => onSave(p, "Setup saved.")}
         />
       ))}
+      <CustomerOrders pad={pad} onSave={onSave} />
       <Suppliers pad={pad} onSave={onSave} />
       <ProductMap pad={pad} onSave={onSave} />
       <NewPad onActivate={onActivate} />

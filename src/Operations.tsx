@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { Pad, Silo } from "./types";
 import { ApiError, request, today } from "./api";
 import { Tank, pounds } from "./Yard";
+import { DrawOrderNote } from "./CustomerOrders";
 type Save = (p: Pad, message?: string) => void;
 export function SiloRail({ pad, silo }: { pad: Pad; silo: Silo }) {
   const mesh = pad.sand_types.find((m) => m.id === silo.sand_type_id)!;
@@ -52,6 +53,7 @@ export function SiloRail({ pad, silo }: { pad: Pad; silo: Silo }) {
         <p className="muted">Offline silos are excluded from planned pulls.</p>
       )}
       <p className="rail-note">Starting balance + deliveries − runs</p>
+      <DrawOrderNote pad={pad} />
     </>
   );
 }
@@ -303,6 +305,7 @@ export function PullSheet({ pad }: { pad: Pad }) {
         </button>
       </div>
       <section className="print-sheet">
+        <DrawOrderNote pad={pad} />
         <h2 className="print-only">Sand Pad · Pull sheet</h2>
         {pad.next ? (
           <>
@@ -387,6 +390,7 @@ export function RecordRun({
   selected,
   setSelected,
   onSave,
+  onPlan,
 }: {
   pad: Pad;
   mesh: number;
@@ -394,6 +398,7 @@ export function RecordRun({
   selected: number[];
   setSelected: (ids: number[]) => void;
   onSave: Save;
+  onPlan: (well: number, stage: number) => void;
 }) {
   const [well, setWell] = useState(pad.next?.well.id ?? pad.wells[0]?.id ?? 0);
   const [stage, setStage] = useState(pad.next?.stage ?? 1);
@@ -451,6 +456,7 @@ export function RecordRun({
   return (
     <>
       <h1>Record run</h1>
+      <DrawOrderNote pad={pad} />
       <p className="muted">Click online tanks to build the pull.</p>
       <form onSubmit={save}>
         <label>
@@ -469,7 +475,9 @@ export function RecordRun({
             onChange={(e) => {
               const w = pad.wells.find((w) => w.id === Number(e.target.value))!;
               setWell(w.id);
-              setStage((w.toe_stage ?? pad.settings.toe_stage) ? 0 : 1);
+              const stage = (w.toe_stage ?? pad.settings.toe_stage) ? 0 : 1;
+              setStage(stage);
+              onPlan(w.id, stage);
               setWeights({});
             }}
           >
@@ -494,7 +502,11 @@ export function RecordRun({
               max={pad.wells.find((w) => w.id === well)?.planned_stages}
               required
               value={stage}
-              onChange={(e) => setStage(Number(e.target.value))}
+              onChange={(e) => {
+                setStage(Number(e.target.value));
+                setWeights({});
+                onPlan(well, Number(e.target.value));
+              }}
             />
           </label>
           <label>

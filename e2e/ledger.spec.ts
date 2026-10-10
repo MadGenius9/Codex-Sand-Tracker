@@ -302,3 +302,75 @@ test("Setup holds a real job and settings drive ticket and run screens", async (
   });
   expect(errors).toEqual([]);
 });
+
+test("customer order settings update yard and follow the chosen run well", async ({
+  page,
+}) => {
+  const response = await page.request.post(
+    "http://127.0.0.1:5181/api/pads?pad_id=1",
+    { data: { name: "Customer order QA", copy_setup: true } },
+  );
+  expect(response.status()).toBe(201);
+  const p = await response.json();
+  await page.goto("http://127.0.0.1:5181/?pad_id=" + p.pad.id);
+  await page.getByRole("button", { name: "Setup", exact: true }).click();
+  await page
+    .getByLabel("Order customer", { exact: true })
+    .fill("Northline Energy");
+  await page
+    .getByLabel("Customer draw strategy", { exact: true })
+    .selectOption("custom");
+  await page.getByLabel("Silo order", { exact: true }).fill("3, 1, 2, 5, 4, 6");
+  await page
+    .getByRole("button", { name: "Save customer order", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "Customer pull order saved",
+  );
+  await page
+    .getByRole("button", { name: "Sand Pad yard", exact: true })
+    .click();
+  await page.getByRole("button", { name: /Silo 3,/ }).click();
+  await expect(
+    page.locator(".readings").nth(1).locator("dd").first(),
+  ).toHaveText("1");
+  await expect(page.getByText(/Northline Energy customer order/)).toBeVisible();
+  await page.getByRole("button", { name: "Setup", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit " + p.wells[1].name, exact: true })
+    .click();
+  await page
+    .locator(".entity-form")
+    .getByLabel("Customer", { exact: true })
+    .fill("Customer B");
+  await page
+    .locator(".entity-form")
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
+  await expect(page.locator(".entity-form")).toHaveCount(0);
+  await page.getByLabel("Order customer", { exact: true }).fill("Customer B");
+  await page
+    .getByLabel("Customer draw strategy", { exact: true })
+    .selectOption("fullest");
+  await page
+    .getByRole("button", { name: "Save customer order", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "Customer pull order saved",
+  );
+  await page.getByRole("button", { name: "Record run", exact: true }).click();
+  await page.getByLabel("Well").selectOption(String(p.wells[1].id));
+  await expect(page.getByText(/Customer B customer order/)).toBeVisible();
+  await expect(page.locator(".next-stage")).toContainText(p.wells[1].name);
+  await page.getByRole("button", { name: "Pull sheet", exact: true }).click();
+  await expect(page.locator(".print-sheet")).toContainText(
+    "Northline Energy customer order",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Setup", exact: true }).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

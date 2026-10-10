@@ -240,6 +240,10 @@ export function ledgerRoutes(app: Express, db: Database.Database) {
           db.prepare(
             "INSERT INTO mine_codes(pad_id,product_code,sand_type_id) VALUES(?,?,?)",
           ).run(id, m.product_code, meshes.get(m.sand_type_id));
+        for (const o of p.customer_orders)
+          db.prepare(
+            "INSERT INTO customer_orders(pad_id,customer,strategy,silo_order) VALUES(?,?,?,?)",
+          ).run(id, o.customer, o.strategy, JSON.stringify(o.silo_order));
       }
       return id;
     })();

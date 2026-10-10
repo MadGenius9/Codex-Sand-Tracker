@@ -154,11 +154,16 @@ test("local SQLite survives closing and reopening without reseeding", () => {
     db.prepare(
       "INSERT INTO deliveries(pad_id,date,ticket_number,supplier,product_code,sand_type_id,pounds,silo_id) VALUES(1,'2026-10-09','PERSIST','Test','100M',1,1234,2)",
     ).run();
+    db.prepare(
+      "INSERT INTO customer_orders(pad_id,customer,strategy,silo_order) VALUES(1,'Northline Energy','custom','[3,1,2]')",
+    ).run();
     const before = snapshot(db);
     db.close();
     db = openStore(file);
     assert.equal(snapshot(db).deliveries.length, 3);
     assert.equal(snapshot(db).silos[1].on_hand, before.silos[1].on_hand);
+    assert.deepEqual(snapshot(db).customer_orders[0].silo_order, [3, 1, 2]);
+    assert.equal(snapshot(db).next?.plans[0].pulls[0].silo_id, 3);
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });

@@ -89,6 +89,18 @@ export interface Pad {
   deliveries: Delivery[];
   runs: Run[];
   suppliers: { id: number; name: string }[];
+  customer_orders: {
+    id: number;
+    customer: string;
+    strategy: Pad["settings"]["strategy"] | "custom";
+    silo_order: number[];
+  }[];
+  draw_order: {
+    customer: string;
+    strategy: Pad["settings"]["strategy"] | "custom";
+    source: string;
+    silo_order: number[];
+  };
   all_wells: Well[];
   all_silos: Silo[];
   job_design: {

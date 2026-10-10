@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { snapshot } from "./store";
 import { captureDesign } from "./migrate";
 import { jobRoutes, afterRun } from "./job";
+import { customerOrderRoutes } from "./customer-orders";
 import {
   ledgerRoutes,
   rememberProduct,
@@ -147,6 +148,7 @@ export function createApp(db: Database.Database) {
     res.status(201).json(result);
   });
   jobRoutes(app, db);
+  customerOrderRoutes(app, db);
   ledgerRoutes(app, db);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "API route not found." }),

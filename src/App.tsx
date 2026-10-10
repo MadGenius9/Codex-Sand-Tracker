@@ -8,6 +8,8 @@ import LedgerLog from "./LedgerLog";
 type Screen = "Pad" | "Tickets" | "Pull sheet" | "Record run" | "Setup" | "Log";
 export default function App() {
   const [pad, setPad] = useState<Pad | null>(null);
+  const [runPad, setRunPad] = useState<Pad | null>(null);
+  const planRequest = useRef(0);
   const [screen, setScreen] = useState<Screen>("Pad");
   const [selected, setSelected] = useState(3);
   const [pull, setPull] = useState<number[]>([]);
@@ -46,10 +48,14 @@ export default function App() {
   function save(p: Pad, msg = "") {
     if (p.pad.id !== currentPad.current) return;
     setPad(p);
+    setRunPad(null);
+    planRequest.current++;
     setMessage(msg);
     setError("");
   }
   function activate(p: Pad) {
+    setRunPad(null);
+    planRequest.current++;
     const url = new URL(window.location.href);
     url.searchParams.set("pad_id", String(p.pad.id));
     window.history.replaceState(null, "", url);
@@ -90,6 +96,19 @@ export default function App() {
         );
     }
   }
+  async function preview(well_id: number, stage: number) {
+    const token = ++planRequest.current;
+    try {
+      const p = await request("pull-plan", { well_id, stage });
+      if (token === planRequest.current && p.pad.id === currentPad.current) {
+        setRunPad(p);
+        setError("");
+      }
+    } catch (e) {
+      if (token === planRequest.current) setError((e as Error).message);
+    }
+  }
+  const displayed = screen === "Record run" && runPad ? runPad : pad;
   const silo = pad?.silos.find((s) => s.id === selected) ?? pad?.silos[0];
   return (
     <div className="app">
@@ -132,6 +151,8 @@ export default function App() {
               aria-current={screen === name ? "page" : undefined}
               onClick={() => {
                 setScreen(name);
+                setRunPad(null);
+                planRequest.current++;
                 setError("");
                 setMessage("");
                 setPull([]);
@@ -166,7 +187,7 @@ export default function App() {
         <>
           <main className="workspace" key={pad.pad.id}>
             <Yard
-              pad={pad}
+              pad={displayed!}
               selected={selected}
               onSelect={select}
               multi={screen === "Record run" ? pull : []}
@@ -187,7 +208,8 @@ export default function App() {
               {screen === "Pull sheet" && <PullSheet pad={pad} />}{" "}
               {screen === "Record run" && (
                 <RecordRun
-                  pad={pad}
+                  pad={displayed!}
+                  onPlan={preview}
                   mesh={mesh}
                   setMesh={setMesh}
                   selected={pull}
@@ -218,8 +240,8 @@ export default function App() {
             <div className="next-stage">
               <span>NEXT STAGE</span>
               <strong>
-                {pad.next
-                  ? `${pad.next.well.name} · ${pad.next.stage}`
+                {displayed?.next
+                  ? `${displayed.next.well.name} · ${displayed.next.stage}`
                   : "Pad complete"}
               </strong>
             </div>

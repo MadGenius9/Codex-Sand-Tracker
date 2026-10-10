@@ -5,6 +5,7 @@ import type { Well, Sand, Silo, Delivery, Run, Pad, Plan } from "../src/types";
 import { migrate } from "./migrate";
 import { migrateJob } from "./job-migrate";
 import { reduceOriginalDemo } from "./demo";
+import { migrateCustomerOrders } from "./customer-orders";
 
 export function openStore(file: string, seed = true) {
   if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
@@ -76,11 +77,16 @@ export function openStore(file: string, seed = true) {
     })();
   migrate(db, freshDemo);
   migrateJob(db);
+  migrateCustomerOrders(db);
   reduceOriginalDemo(db);
   return db;
 }
 
-export function snapshot(db: Database.Database, padId = 1): Pad {
+export function snapshot(
+  db: Database.Database,
+  padId = 1,
+  context?: { wellId: number; stage: number },
+): Pad {
   const pad = db
     .prepare("SELECT * FROM pads WHERE id=?")
     .get(padId) as Pad["pad"];
@@ -195,6 +201,25 @@ export function snapshot(db: Database.Database, padId = 1): Pad {
         plans: [],
       };
   }
+  if (context) {
+    const well = wells.find((w) => w.id === context.wellId);
+    if (well) next = { well, stage: context.stage, plans: [] };
+  }
+  const customer_orders = (
+    db
+      .prepare("SELECT * FROM customer_orders WHERE pad_id=? ORDER BY customer")
+      .all(padId) as {
+      id: number;
+      customer: string;
+      strategy: Pad["settings"]["strategy"] | "custom";
+      silo_order: string;
+    }[]
+  ).map((r) => ({ ...r, silo_order: JSON.parse(r.silo_order) as number[] }));
+  const customer = next?.well.customer.trim() || pad.customer.trim();
+  const customerOrder = customer_orders.find(
+    (o) => o.customer.toLowerCase() === customer.toLowerCase(),
+  );
+  const strategy = customerOrder?.strategy ?? settings.strategy;
   for (const mesh of sand_types) {
     const online = silos.filter(
       (s) => s.sand_type_id === mesh.id && !s.offline,
@@ -208,24 +233,31 @@ export function snapshot(db: Database.Database, padId = 1): Pad {
     let strategyOrder = rotated;
     const used = (id: number) =>
       runs.filter((r) => r.silo_id === id).reduce((n, r) => n + r.pounds, 0);
-    if (settings.strategy === "partials")
+    if (strategy === "partials")
       strategyOrder = [
         ...rotated.filter((s) => s.on_hand > 0 && s.on_hand < s.capacity),
         ...rotated.filter((s) => !(s.on_hand > 0 && s.on_hand < s.capacity)),
       ];
-    if (settings.strategy === "least_used")
+    if (strategy === "least_used")
       strategyOrder = [...rotated].sort((a, b) => used(a.id) - used(b.id));
-    if (settings.strategy === "emptiest")
+    if (strategy === "emptiest")
       strategyOrder = [...rotated].sort((a, b) => a.percent - b.percent);
-    if (settings.strategy === "fullest")
+    if (strategy === "fullest")
       strategyOrder = [...rotated].sort((a, b) => b.percent - a.percent);
-    if (settings.strategy === "pairs") {
+    if (strategy === "pairs") {
       const positions = [6, 2, 5, 1, 4, 3];
       const yard = [...silos].sort((a, b) => a.number - b.number);
       const ids = positions.map((n) => yard[n - 1]?.id);
       strategyOrder = [...online].sort(
         (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id),
       );
+    }
+    if (strategy === "custom") {
+      const rank = (s: Silo) => {
+        const i = customerOrder!.silo_order.indexOf(s.number);
+        return i < 0 ? Infinity : i;
+      };
+      strategyOrder = [...rotated].sort((a, b) => rank(a) - rank(b));
     }
     const order = strategyOrder
       .map((s, i) => ({ s, i }))
@@ -333,6 +365,13 @@ export function snapshot(db: Database.Database, padId = 1): Pad {
     ledger: { deliveries: allDeliveries, runs: allRuns },
     stage_history,
     product_map,
+    customer_orders,
+    draw_order: {
+      customer,
+      strategy,
+      source: customerOrder ? "customer" : "pad",
+      silo_order: customerOrder?.silo_order ?? [],
+    },
     suppliers: db
       .prepare("SELECT id,name FROM suppliers WHERE pad_id=? ORDER BY name")
       .all(padId) as Pad["suppliers"],
