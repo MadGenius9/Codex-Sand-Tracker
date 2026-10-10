@@ -1,8 +1,8 @@
-# Sand Pad
+# PYTHON / SAND TRACKER
 
 Customer pull orders in Setup save a draw strategy or custom sequence of up to six actual silo numbers for each customer on the pad. The next well's customer selects the rule (case-insensitive), falling back to the pad customer for blank wells, then the pad strategy when no rule exists. Manual pins still take priority. Custom orders skip offline/removed tanks and filter by mesh; unlisted tanks follow rotation. Selecting a different well or stage in Record run previews its own customer plan without changing the saved job cursor. Copying pad setup includes customer orders.
 
-A local frac-sand pad tracker. The yard is the primary surface: select a steel silo to inspect its balance or work with tickets and stage pulls.
+A local frac-sand pad tracker. The yard is the primary surface: select a glass silo to inspect its balance or work with tickets and stage pulls.
 
 ## Run
 
@@ -27,12 +27,12 @@ The production server serves the built client and API at http://127.0.0.1:3001. 
 
 ## Operations
 
-- **Pad:** two yard rows. Hover or keyboard-focus a silo to read pounds and stages; click for its rail. Low means less than one stage in that tank. Offline stock is shown but excluded from stage planning and reorder coverage.
+- **Board:** Live Silo Inventory shows Side A and Side B with real pounds, percent full, mesh and status. Hover or keyboard-focus a silo for pounds and stages; click for its detail rail. Mesh colors are configured in Setup. Low tanks (25% or less) are amber; critical tanks (10% or less) are red. Offline stock is visible but excluded from planning and reorder coverage. Stage progress, recent tickets and inventory alerts appear below the yard. The red Receive ticket action opens Tickets with the selected silo.
 - **Tickets:** click a receiving silo, enter its delivery, save. Mesh follows the silo assignment unless a saved mine-code mapping fills it. A mapped mesh must match the selected silo before saving. The optional remember checkbox saves the mapping for the next ticket. Duplicate active ticket numbers are checked case-insensitively within the pad; explicit confirmation is required before a duplicate save. Product code is optional. Capacity overflow is rejected.
-- **Pull sheet:** the next unfinished well/stage, with each mesh's remaining design pounds allocated in draw order. Print prints the sheet alone. Shortfalls are visible rather than silently reducing the required stage pounds.
-- **Record run:** enter the run date, select a mesh and click one or more online tanks. Adjust pounds per tank and save the entire pull atomically. Before/after balances remain visible. A stage captures its mesh design on the first run and advances once all those meshes meet design pounds. Partial runs count toward completion; additional runs and corrected stage/well selections are permitted, but inventory cannot go below zero.
-- **Log:** filter tickets and runs by date and type, with silo, mesh, well and stage. Edit a record or confirm its void here. Every successful change returns recomputed inventory. Voided records remain visible and are excluded from balances, rotation and stage completion. Original values for edits and voids are retained in the database audit table. Corrections are rejected if they would leave any affected silo below zero or above capacity. Voiding or reducing a completed run can reopen that stage.
-- **Stage history:** in Log, compare pumped and captured design pounds by well, stage and mesh. Short means at least one mesh is below design, including a partially recorded stage. Later mesh design edits affect new stages, while recorded stage designs remain stable. The first migration captures the legacy stages' design using the existing setup; historical design changes before this release were not recorded. Legacy runs without dates are labeled **Undated legacy**, rather than assigned an invented date; date filters exclude them. Enter the actual date when editing an undated run.
+- **Stages / Pull sheet:** the next unfinished well/stage, with each mesh's remaining design pounds allocated in draw order. Print prints the sheet alone. Shortfalls are visible rather than silently reducing the required stage pounds.
+- **Stages / Record run:** enter the run date, select a mesh and click one or more online tanks. Adjust pounds per tank and save the entire pull atomically. Before/after balances remain visible. A stage captures its mesh design on the first run and advances once all those meshes meet design pounds. Partial runs count toward completion; additional runs and corrected stage/well selections are permitted, but inventory cannot go below zero.
+- **Reports:** filter tickets and runs by date and type, with silo, mesh, well and stage. Edit a record or confirm its void here. Every successful change returns recomputed inventory. Voided records remain visible and are excluded from balances, rotation and stage completion. Original values for edits and voids are retained in the database audit table. Corrections are rejected if they would leave any affected silo below zero or above capacity. Voiding or reducing a completed run can reopen that stage.
+- **Stage history:** in Stages, compare pumped and captured design pounds by well, stage and mesh. Short means at least one mesh is below design, including a partially recorded stage. Later mesh design edits affect new stages, while recorded stage designs remain stable. The first migration captures the legacy stages' design using the existing setup; historical design changes before this release were not recorded. Legacy runs without dates are labeled **Undated legacy**, rather than assigned an invented date; date filters exclude them. Enter the actual date when editing an undated run.
 - **Setup:** add or edit wells, meshes and silos, adjust the reserve (default five stages), offline status and optional pins. A silo with ledger history (including voids) cannot change mesh. Starting-balance changes affect the computed balance and are validated against capacity. Create pads, manage suppliers and mine-code mappings and download SQLite here.
 - **Pad switcher:** the header selects the pad. The selection is recorded in the URL so a reload retains it. Creating a pad preserves every existing pad's ledger. Optionally copy wells, meshes and silo setup, with zero starting balances and no deliveries or runs copied. Job settings, well overrides, suppliers and mine-code mappings are copied. Each pad has its own reserve, inventory, stage history and mappings.
 
@@ -48,7 +48,11 @@ Tests cover ledger arithmetic, rotation/pins, offline reserve, partial and compl
 
 The browser test starts its own temporary API with an in-memory database, so it does not modify the local demo ledger. Set `PLAYWRIGHT_CHANNEL=msedge` to use installed Edge instead of downloaded Chromium. Screenshots and test outputs go to the ignored `qa/` directory.
 
-![Sand Pad yard](docs/yard-preview.png)
+## Board shell
+
+The six screens share a near-black blue shell with cyan borders and a blue active navigation pill: Board, Tickets, Stages, Inventory, Reports and Setup. Inventory compares on-hand, planned, whole-job design and pumped pounds by mesh. Reports includes daily ticket and run totals plus the editable ledger. On phones, the Board stacks the yard, stage progress and primary ticket action before the detail rail.
+
+Setup saves job names and shift choices on each pad. Header job and shift selectors save the current choice; customer and well selectors preview the relevant well and next unfinished stage. These labels provide working context within the pad; the inventory and ledger remain pad-scoped. No customer, job, well or shift is hardcoded.
 
 ## Real job setup
 
@@ -56,6 +60,6 @@ Pad identity stores customer, pounds per ton (2000), pounds per truckload (57000
 
 Available strategies are sequential rotation, partials then rotation, least cumulative pounds used, emptiest percent first, fullest percent first, and six silo positions 6, 2, 5, 1, then 4, 3. Manual pins precede any strategy. Clear-pins applies only once all meshes meet the captured stage design. Turning auto-advance off holds the last recorded well/stage and exposes a current-stage selector in Setup.
 
-Removing a well or silo retires it from the active job. Removal with any ledger history requires confirmation, and ledger rows, names and stage history remain available in Log. Silo numbers stay reserved by retired silos so historical identities remain unambiguous. Supplier choices are saved per pad; a new supplier can be added during ticket entry. Mine codes map directly to mesh independently of supplier.
+Removing a well or silo retires it from the active job. Removal with any ledger history requires confirmation, and ledger rows, names and stage history remain available in Reports. Silo numbers stay reserved by retired silos so historical identities remain unambiguous. Supplier choices are saved per pad; a new supplier can be added during ticket entry. Mine codes map directly to mesh independently of supplier.
 
 Pads allow at most six active silos, including offline silos. Setup disables Add silo at the limit and the API enforces it. Retiring a silo frees a slot without removing ledger rows. Existing job equipment is preserved; an older pad above the limit must retire excess silos before copying setup. The unchanged original demo is reduced to six active silos while retaining retired equipment and its history.

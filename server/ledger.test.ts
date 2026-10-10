@@ -9,6 +9,7 @@ import { createApp } from "./app";
 import { migrate } from "./migrate";
 import { migrateJob } from "./job-migrate";
 import { migrateCustomerOrders } from "./customer-orders";
+import { migrateBoard } from "./board-migrate";
 
 test("legacy migration preserves ledger IDs, balances and undated runs; reopening never reseeds", () => {
   const dir = mkdtempSync(join(tmpdir(), "sand-pad-migration-")),
@@ -24,6 +25,7 @@ test("legacy migration preserves ledger IDs, balances and undated runs; reopenin
     migrate(db, false);
     migrateJob(db);
     migrateCustomerOrders(db);
+    migrateBoard(db);
     const p = snapshot(db);
     assert.equal(p.silos[0].on_hand, 1500);
     assert.equal(p.deliveries[0].id, 21);

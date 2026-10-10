@@ -18,6 +18,54 @@ export function jobRoutes(app: Express, db: Database.Database) {
       const old = snapshot(db, id),
         b = req.body,
         s = { ...old.settings, ...b };
+      const shifts =
+        b.shift_names === undefined ? old.pad.shift_names : b.shift_names;
+      const jobs = b.job_names ?? old.pad.job_names;
+      if (
+        !Array.isArray(jobs) ||
+        jobs.length > 30 ||
+        jobs.some(
+          (n) => typeof n !== "string" || !n.trim() || n.length > 200,
+        ) ||
+        new Set(jobs.map((n) => n.trim().toLowerCase())).size !== jobs.length
+      )
+        fail("Use unique job names (up to 30).");
+      const job =
+        b.job_name === undefined ? old.pad.job_name : text(b.job_name);
+      const names = jobs.length ? jobs.map((n) => n.trim()) : job ? [job] : [];
+      const activeJob = names.includes(job) ? job : (names[0] ?? "");
+      if (
+        b.job_names === undefined &&
+        b.job_name !== undefined &&
+        jobs.length &&
+        !names.includes(job)
+      )
+        fail("Select a job configured in Setup.");
+      db.prepare("UPDATE pads SET job_names=? WHERE id=?").run(
+        JSON.stringify(names),
+        id,
+      );
+      if (
+        !Array.isArray(shifts) ||
+        shifts.length > 20 ||
+        shifts.some(
+          (n) => typeof n !== "string" || !n.trim() || n.length > 100,
+        ) ||
+        new Set(shifts.map((n) => n.trim().toLowerCase())).size !==
+          shifts.length
+      )
+        fail("Use unique shift names (up to 20).");
+      const shift =
+        b.active_shift === undefined
+          ? shifts.includes(old.pad.active_shift)
+            ? old.pad.active_shift
+            : (shifts[0] ?? "")
+          : text(b.active_shift);
+      if (shift && !shifts.includes(shift))
+        fail("Select a shift configured in Setup.");
+      db.prepare(
+        "UPDATE pads SET job_name=?,shift_names=?,active_shift=? WHERE id=?",
+      ).run(activeJob, JSON.stringify(shifts.map((n) => n.trim())), shift, id);
       if (
         ![
           "sequential",
@@ -114,11 +162,15 @@ export function jobRoutes(app: Express, db: Database.Database) {
           toe,
         ];
       } else if (entity === "sand_types") {
-        fields = ["name", "design_pounds", "job_total"];
+        const color = b.color ?? stored?.color ?? "#38bdf8";
+        if (typeof color !== "string" || !/^#[0-9a-f]{6}$/i.test(color))
+          fail("Use a six-digit mesh color.");
+        fields = ["name", "design_pounds", "job_total", "color"];
         values = [
           str(b.name, "Sand name"),
           num(b.design_pounds, "Design pounds", 1),
           num(b.job_total ?? stored?.job_total ?? 0, "Whole-job pounds"),
+          color,
         ];
       } else {
         const mesh = num(b.sand_type_id, "Mesh", 1, true);

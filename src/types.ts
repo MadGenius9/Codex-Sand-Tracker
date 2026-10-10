@@ -8,6 +8,7 @@ export interface Well {
   overrides: { sand_type_id: number; pounds: number }[];
 }
 export interface Sand {
+  color: string;
   id: number;
   name: string;
   design_pounds: number;
@@ -61,7 +62,15 @@ export interface Plan {
   pulls: { silo_id: number; pounds: number }[];
 }
 export interface Pad {
-  pad: { id: number; name: string; customer: string };
+  pad: {
+    id: number;
+    name: string;
+    customer: string;
+    job_name: string;
+    job_names: string[];
+    shift_names: string[];
+    active_shift: string;
+  };
   pads: { id: number; name: string }[];
   ledger: { deliveries: Delivery[]; runs: Run[] };
   stage_history: {

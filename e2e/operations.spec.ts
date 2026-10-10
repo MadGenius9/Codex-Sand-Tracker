@@ -31,7 +31,9 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("http://127.0.0.1:5180");
-  await expect(page.getByRole("button", { name: /Silo \d/ })).toHaveCount(6);
+  await expect(
+    page.locator(".yard").getByRole("button", { name: /Silo \d/ }),
+  ).toHaveCount(6);
   await expect(page.getByRole("heading", { name: "Silo 03" })).toBeVisible();
   await page.screenshot({ path: "qa/yard-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
@@ -53,13 +55,14 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   await expect(
     page.getByRole("cell", { name: "QA-001 QA Sand · 100 mesh" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Pull sheet", exact: true }).click();
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await expect(page.locator(".sheet-heading")).toContainText("Stage 2");
   await page.emulateMedia({ media: "print" });
   await expect(page.locator(".yard")).toBeHidden();
   await expect(page.locator(".print-sheet")).toBeVisible();
   await page.screenshot({ path: "qa/pull-print.png", fullPage: true });
   await page.emulateMedia({ media: "screen" });
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.getByRole("button", { name: "Record run", exact: true }).click();
   await page.getByRole("button", { name: /Silo 2,/ }).click();
   await page.getByLabel("Pounds from silo 2").fill("80000");

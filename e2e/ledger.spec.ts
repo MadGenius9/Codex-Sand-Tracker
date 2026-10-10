@@ -31,6 +31,7 @@ test.afterAll(async () => {
   await new Promise<void>((resolve) => api?.close(() => resolve()));
   db.close();
 });
+
 test("edits and voids update yard; log, pads, stage history, mappings and download", async ({
   page,
 }) => {
@@ -40,8 +41,10 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
     if (m.type() === "error") errors.push(`${m.text()} (${m.location().url})`);
   });
   await page.goto("http://127.0.0.1:5181/");
-  await expect(page).toHaveTitle("Sand Pad");
-  await expect(page.getByRole("button", { name: /Silo \d/ })).toHaveCount(6);
+  await expect(page).toHaveTitle("PYTHON · SAND TRACKER");
+  await expect(
+    page.locator(".yard").getByRole("button", { name: /Silo \d/ }),
+  ).toHaveCount(6);
   await page.screenshot({
     path: join(artifacts, "sand-pad-desktop.png"),
     fullPage: true,
@@ -65,7 +68,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
   await page.getByLabel("Pounds", { exact: true }).fill("5000");
   await page.getByRole("button", { name: "Save delivery" }).click();
   await expect(page.getByRole("status")).toContainText("180,000");
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   await page
     .getByRole("button", { name: "Edit ticket LEDGER-001", exact: true })
     .click();
@@ -78,7 +81,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
     .click();
   await page.getByRole("button", { name: /Silo 5,/ }).click();
   await expect(page.locator(".readings").first()).toContainText("178,000");
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   await page.getByLabel("From date").fill("2026-10-08");
   await page.getByLabel("Through date").fill("2026-10-08");
   await expect(
@@ -97,12 +100,13 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
     .getByRole("button", { name: "Sand Pad yard", exact: true })
     .click();
   await expect(page.locator(".readings").first()).toContainText("175,000");
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.getByRole("button", { name: "Record run", exact: true }).click();
   await page.getByRole("button", { name: /Silo 2,/ }).click();
   await page.getByLabel("Pounds from silo 2").fill("40000");
   await page.getByRole("button", { name: "Save run", exact: true }).click();
   await expect(page.locator(".run-result")).toContainText("122,000");
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   await page.getByRole("button", { name: "Edit run 3", exact: true }).click();
   await page.getByLabel("Pounds", { exact: true }).fill("20000");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
@@ -125,7 +129,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
     .getByRole("button", { name: "Sand Pad yard", exact: true })
     .click();
   await expect(page.locator(".readings").first()).toContainText("142,000");
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   await page.getByRole("button", { name: "Edit run 3", exact: true }).click();
   await page.getByRole("button", { name: "Void record", exact: true }).click();
   await page.getByRole("button", { name: "Confirm void", exact: true }).click();
@@ -154,7 +158,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
   await expect(
     page.getByRole("button", { name: /Silo 1,.*0 pounds/ }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   await expect(page.getByText("No records in this date range.")).toBeVisible();
   await page.getByLabel("Active pad").selectOption("1");
   await expect(
@@ -196,7 +200,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
     path: join(artifacts, "sand-pad-mobile.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -262,16 +266,22 @@ test("Setup holds a real job and settings drive ticket and run screens", async (
     path: join(artifacts, "sand-pad-job-setup.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Pull sheet", exact: true }).click();
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await expect(page.locator(".sheet-heading")).toContainText("Toe stage");
   await expect(page.locator(".mesh-sheet").first()).toContainText(
     "Design 1,000 lb",
   );
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.getByRole("button", { name: "Record run", exact: true }).click();
   await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("0");
   await page.getByRole("button", { name: /Silo 3,/ }).click();
   await page.getByLabel("Pounds from silo 3", { exact: true }).fill("1000");
   await page.getByRole("button", { name: "Save run", exact: true }).click();
+  await page.screenshot({
+    path: join(artifacts, "python-after-run.png"),
+    fullPage: true,
+  });
+  await expect(page.getByRole("status")).toContainText("Run recorded");
   await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("1");
   await expect(page.locator(".run-result")).toContainText("10,000 → 9,000");
   await page.getByRole("button", { name: "Setup", exact: true }).click();
@@ -285,7 +295,7 @@ test("Setup holds a real job and settings drive ticket and run screens", async (
   await expect(
     page.getByRole("button", { name: "Edit silo 3", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Log", exact: true }).click();
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
   await expect(
     page.getByRole("row").filter({ hasText: "Toe stage" }),
   ).toHaveCount(3);
@@ -358,13 +368,19 @@ test("customer order settings update yard and follow the chosen run well", async
   await expect(page.getByRole("status")).toContainText(
     "Customer pull order saved",
   );
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await page.getByRole("button", { name: "Record run", exact: true }).click();
-  await page.getByLabel("Well").selectOption(String(p.wells[1].id));
+  await page
+    .locator(".operation-rail")
+    .getByLabel("Well")
+    .selectOption(String(p.wells[1].id));
   await expect(page.getByText(/Customer B customer order/)).toBeVisible();
-  await expect(page.locator(".next-stage")).toContainText(p.wells[1].name);
-  await page.getByRole("button", { name: "Pull sheet", exact: true }).click();
+  await expect(page.getByLabel("Active well")).toHaveValue(
+    String(p.wells[1].id),
+  );
+  await page.getByRole("button", { name: "Stages", exact: true }).click();
   await expect(page.locator(".print-sheet")).toContainText(
-    "Northline Energy customer order",
+    "Customer B customer order",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Setup", exact: true }).click();
@@ -373,4 +389,86 @@ test("customer order settings update yard and follow the chosen run well", async
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("Python board uses saved selectors, live fill, six screens and mobile action order", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const response = await page.request.post(
+    "http://127.0.0.1:5181/api/pads?pad_id=1",
+    { data: { name: "Board layout QA", copy_setup: true } },
+  );
+  const p = await response.json();
+  expect(response.status()).toBe(201);
+  await page.request.put(
+    "http://127.0.0.1:5181/api/settings?pad_id=" + p.pad.id,
+    {
+      data: {
+        job_names: ["Job Alpha", "Job Beta"],
+        job_name: "Job Alpha",
+        shift_names: ["Day", "Night"],
+      },
+    },
+  );
+  await page.request.post(
+    "http://127.0.0.1:5181/api/setup/silos?pad_id=" + p.pad.id,
+    { data: { ...p.silos[0], starting_balance: 50000 } },
+  );
+  await page.goto("http://127.0.0.1:5181/?pad_id=" + p.pad.id);
+  await expect(page).toHaveTitle("PYTHON · SAND TRACKER");
+  await expect(
+    page.getByRole("heading", { name: "Live Silo Inventory" }),
+  ).toBeVisible();
+  await expect(page.locator("nav button")).toHaveCount(6);
+  await expect(page.getByLabel("Active job")).toHaveValue("Job Alpha");
+  await page.getByLabel("Active job").selectOption("Job Beta");
+  await expect(page.getByRole("status")).toContainText("Job updated");
+  await page.getByLabel("Active shift").selectOption("Night");
+  await expect(page.getByRole("status")).toContainText("Shift updated");
+  const tank = page.locator(".yard").getByRole("button", { name: /Silo 1,/ });
+  await tank.click();
+  await expect(tank).toContainText("20.0% FULL");
+  const beforeY = await tank.locator(".sand-fill").getAttribute("y");
+  await page.screenshot({
+    path: join(artifacts, "python-board-desktop.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Receive sand/ }).click();
+  await expect(page.getByText(/Receiving into Silo 01/)).toBeVisible();
+  await page.getByLabel("Supplier", { exact: true }).selectOption("Atlas Sand");
+  await page.getByLabel("Ticket number", { exact: true }).fill("BOARD-QA-001");
+  await page.getByLabel("Pounds", { exact: true }).fill("50000");
+  await page.getByRole("button", { name: "Save delivery" }).click();
+  await expect(page.getByRole("status")).toContainText("100,000");
+  await page.getByRole("button", { name: "Board", exact: true }).click();
+  await expect(tank).toContainText("40.0% FULL");
+  expect(await tank.locator(".sand-fill").getAttribute("y")).not.toBe(beforeY);
+  await page.getByRole("button", { name: "Inventory", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Inventory", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".inventory-mesh").first()).toContainText(
+    "100,000",
+  );
+  await page.getByRole("button", { name: "Reports", exact: true }).click();
+  await expect(page.locator(".daily-summary")).toContainText("50,000");
+  await page.getByRole("button", { name: "Board", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const yard = await page.locator(".yard-panel").boundingBox(),
+    progress = await page.locator(".stage-progress").boundingBox(),
+    action = await page.locator(".receive-action").boundingBox();
+  expect(yard!.y).toBeLessThan(progress!.y);
+  expect(progress!.y).toBeLessThan(action!.y);
+  await page.screenshot({
+    path: join(artifacts, "python-board-mobile.png"),
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
 });

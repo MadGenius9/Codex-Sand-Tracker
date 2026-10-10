@@ -181,9 +181,10 @@ export function ledgerRoutes(app: Express, db: Database.Database) {
             Number(
               db
                 .prepare(
-                  "INSERT INTO sand_types(pad_id,name,design_pounds,job_total) VALUES(?,?,?,?)",
+                  "INSERT INTO sand_types(pad_id,name,design_pounds,job_total,color) VALUES(?,?,?,?,?)",
                 )
-                .run(id, m.name, m.design_pounds, m.job_total).lastInsertRowid,
+                .run(id, m.name, m.design_pounds, m.job_total, m.color)
+                .lastInsertRowid,
             ),
           );
         for (const s of p.silos)
@@ -217,6 +218,15 @@ export function ledgerRoutes(app: Express, db: Database.Database) {
         }
         db.prepare("UPDATE pads SET customer=? WHERE id=?").run(
           p.pad.customer,
+          id,
+        );
+        db.prepare(
+          "UPDATE pads SET job_name=?,shift_names=?,active_shift=?,job_names=? WHERE id=?",
+        ).run(
+          p.pad.job_name,
+          JSON.stringify(p.pad.shift_names),
+          p.pad.active_shift,
+          JSON.stringify(p.pad.job_names),
           id,
         );
         db.prepare(

@@ -99,7 +99,7 @@ export default function LedgerLog({
     );
   return (
     <main className="setup ledger-screen">
-      <h1>Log</h1>
+      <h1>Reports</h1>
       <p className="muted">
         {pad.pad.name} · Delivery tickets and runs. Voided entries stay in the
         log and are excluded from inventory.

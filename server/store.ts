@@ -6,6 +6,7 @@ import { migrate } from "./migrate";
 import { migrateJob } from "./job-migrate";
 import { reduceOriginalDemo } from "./demo";
 import { migrateCustomerOrders } from "./customer-orders";
+import { migrateBoard } from "./board-migrate";
 
 export function openStore(file: string, seed = true) {
   if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
@@ -78,6 +79,7 @@ export function openStore(file: string, seed = true) {
   migrate(db, freshDemo);
   migrateJob(db);
   migrateCustomerOrders(db);
+  migrateBoard(db);
   reduceOriginalDemo(db);
   return db;
 }
@@ -91,6 +93,8 @@ export function snapshot(
     .prepare("SELECT * FROM pads WHERE id=?")
     .get(padId) as Pad["pad"];
   if (!pad) throw Object.assign(new Error("Pad not found."), { status: 404 });
+  pad.shift_names = JSON.parse(pad.shift_names as unknown as string);
+  pad.job_names = JSON.parse(pad.job_names as unknown as string);
   const pads = db
     .prepare("SELECT * FROM pads ORDER BY id")
     .all() as Pad["pads"];

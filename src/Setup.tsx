@@ -22,7 +22,7 @@ function Editor({
     entity === "wells"
       ? ["name", "customer", "planned_stages", "toe_stage"]
       : entity === "sand_types"
-        ? ["name", "design_pounds", "job_total"]
+        ? ["name", "design_pounds", "job_total", "color"]
         : [
             "number",
             "name",
@@ -35,6 +35,7 @@ function Editor({
           ];
   const labels: Record<string, string> = {
     name: "Name",
+    color: "Mesh color",
     customer: "Customer",
     planned_stages: "Planned stages",
     toe_stage: "Toe stage",
@@ -58,7 +59,7 @@ function Editor({
           overrides: [],
         }
       : entity === "sand_types"
-        ? { name: "", design_pounds: 80000, job_total: 0 }
+        ? { name: "", design_pounds: 80000, job_total: 0, color: "#38bdf8" }
         : {
             number: Math.max(0, ...pad.all_silos.map((s) => s.number)) + 1,
             name: "",
@@ -316,7 +317,13 @@ function Editor({
                     !["manual_pin", "customer"].includes(f) &&
                     !(entity === "silos" && f === "name")
                   }
-                  type={["name", "customer"].includes(f) ? "text" : "number"}
+                  type={
+                    f === "color"
+                      ? "color"
+                      : ["name", "customer", "color"].includes(f)
+                        ? "text"
+                        : "number"
+                  }
                   min={["starting_balance", "job_total"].includes(f) ? 0 : 1}
                   step={
                     [
@@ -332,7 +339,7 @@ function Editor({
                   onChange={(e) =>
                     set(
                       f,
-                      ["name", "customer"].includes(f)
+                      ["name", "customer", "color"].includes(f)
                         ? e.target.value
                         : f === "manual_pin" && e.target.value === ""
                           ? null
@@ -412,6 +419,9 @@ export default function Setup({
       ...pad.settings,
       name: pad.pad.name,
       customer: pad.pad.customer,
+      job_name: pad.pad.job_name,
+      shifts: pad.pad.shift_names.join(", "),
+      jobs: pad.pad.job_names.join(", "),
     }),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -421,7 +431,24 @@ export default function Setup({
     setBusy(true);
     setError("");
     try {
-      onSave(await request("settings", form, "PUT"), "Job settings saved.");
+      onSave(
+        await request(
+          "settings",
+          {
+            ...form,
+            job_names: form.jobs
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            shift_names: form.shifts
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+          },
+          "PUT",
+        ),
+        "Job settings saved.",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -434,6 +461,30 @@ export default function Setup({
       <section className="setup-section">
         <h2>Pad identity</h2>
         <form className="settings-form" onSubmit={save}>
+          <label>
+            Jobs · comma separated
+            <input
+              value={form.jobs}
+              onChange={(e) => set("jobs", e.target.value)}
+              placeholder="Configure job names"
+            />
+          </label>
+          <label>
+            Job name
+            <input
+              maxLength={200}
+              value={form.job_name}
+              onChange={(e) => set("job_name", e.target.value)}
+            />
+          </label>
+          <label>
+            Shifts · comma separated
+            <input
+              value={form.shifts}
+              onChange={(e) => set("shifts", e.target.value)}
+              placeholder="Configure shift names"
+            />
+          </label>
           {(
             [
               "name",

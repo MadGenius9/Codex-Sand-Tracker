@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import type { Pad, Silo } from "./types";
 import { ApiError, request, today } from "./api";
 import { Tank, pounds } from "./Yard";
@@ -16,7 +16,7 @@ export function SiloRail({ pad, silo }: { pad: Pad; silo: Silo }) {
         truckloads
       </p>
       <div className="rail-tank">
-        <Tank silo={silo} />
+        <Tank silo={silo} color={mesh.color} />
       </div>
       <dl className="readings">
         <dt>Mesh</dt>
@@ -406,6 +406,13 @@ export function RecordRun({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [runDate, setRunDate] = useState(today());
+  useEffect(() => {
+    if (pad.next) {
+      setWell(pad.next.well.id);
+      setStage(pad.next.stage);
+      setWeights({});
+    }
+  }, [pad.next?.well.id, pad.next?.stage]);
   const [changes, setChanges] = useState<
     { silo_id: number; before: number; after: number }[]
   >([]);
