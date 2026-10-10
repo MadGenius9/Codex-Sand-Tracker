@@ -24,17 +24,17 @@ test("ledger balances, rotation, pins, offline reserve and stage completion", ()
     db.prepare("UPDATE silos SET offline=1 WHERE id=4").run();
     assert.equal(snapshot(db).silos[2].pin_conflict, false);
     db.prepare(
-      "INSERT INTO runs(well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,2,1,40000,3)",
+      "INSERT INTO runs(pad_id,well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,1,2,1,40000,3)",
     ).run();
     p = snapshot(db);
     assert.equal(p.next?.stage, 2);
     assert.equal(p.next?.plans[0].remaining, 40000);
     db.prepare(
-      "INSERT INTO runs(well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,2,1,40000,3)",
+      "INSERT INTO runs(pad_id,well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,1,2,1,40000,3)",
     ).run();
     assert.equal(snapshot(db).next?.stage, 2);
     db.prepare(
-      "INSERT INTO runs(well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,2,2,60000,8)",
+      "INSERT INTO runs(pad_id,well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,1,2,2,60000,8)",
     ).run();
     assert.equal(snapshot(db).next?.stage, 3);
     db.prepare("UPDATE settings SET reserve=100").run();
@@ -152,7 +152,7 @@ test("local SQLite survives closing and reopening without reseeding", () => {
   let db = openStore(file);
   try {
     db.prepare(
-      "INSERT INTO deliveries(date,ticket_number,supplier,product_code,sand_type_id,pounds,silo_id) VALUES('2026-10-09','PERSIST','Test','100M',1,1234,2)",
+      "INSERT INTO deliveries(pad_id,date,ticket_number,supplier,product_code,sand_type_id,pounds,silo_id) VALUES(1,'2026-10-09','PERSIST','Test','100M',1,1234,2)",
     ).run();
     const before = snapshot(db);
     db.close();

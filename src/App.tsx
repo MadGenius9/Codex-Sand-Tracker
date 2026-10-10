@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Pad, Silo } from "./types";
-import { request } from "./api";
+import { request, setActivePad } from "./api";
 import Yard, { pounds } from "./Yard";
 import { PullSheet, RecordRun, SiloRail, Tickets } from "./Operations";
 import Setup from "./Setup";
-type Screen = "Pad" | "Tickets" | "Pull sheet" | "Record run" | "Setup";
+import LedgerLog from "./LedgerLog";
+type Screen = "Pad" | "Tickets" | "Pull sheet" | "Record run" | "Setup" | "Log";
 export default function App() {
   const [pad, setPad] = useState<Pad | null>(null);
   const [screen, setScreen] = useState<Screen>("Pad");
@@ -13,12 +14,24 @@ export default function App() {
   const [mesh, setMesh] = useState(1);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const currentPad = useRef(1);
   useEffect(() => {
     let active = true;
-    request("pad")
+    const requested = Number(
+      new URLSearchParams(window.location.search).get("pad_id") ?? 1,
+    );
+    request(
+      "pad",
+      undefined,
+      "GET",
+      Number.isSafeInteger(requested) && requested > 0 ? requested : 1,
+    )
       .then((p) => {
         if (active) {
           setPad(p);
+          currentPad.current = p.pad.id;
+          setActivePad(p.pad.id);
           setSelected(
             p.silos.find((s) => s.id === 3)?.id ?? p.silos[0]?.id ?? 0,
           );
@@ -31,9 +44,33 @@ export default function App() {
     };
   }, []);
   function save(p: Pad, msg = "") {
+    if (p.pad.id !== currentPad.current) return;
     setPad(p);
     setMessage(msg);
     setError("");
+  }
+  function activate(p: Pad) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("pad_id", String(p.pad.id));
+    window.history.replaceState(null, "", url);
+    currentPad.current = p.pad.id;
+    setActivePad(p.pad.id);
+    setPad(p);
+    setSelected(p.silos[0]?.id ?? 0);
+    setMesh(p.sand_types[0]?.id ?? 0);
+    setPull([]);
+    setError("");
+    setMessage(`Opened ${p.pad.name}.`);
+  }
+  async function switchPad(id: number) {
+    setSwitching(true);
+    try {
+      activate(await request("pad", undefined, "GET", id));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSwitching(false);
+    }
   }
   function select(s: Silo) {
     setSelected(s.id);
@@ -68,24 +105,41 @@ export default function App() {
         >
           Sand Pad
         </button>
+        {pad && (
+          <label className="pad-selector">
+            <span className="sr-only">Active pad</span>
+            <select
+              aria-label="Active pad"
+              value={pad.pad.id}
+              disabled={switching}
+              onChange={(e) => switchPad(Number(e.target.value))}
+            >
+              {pad.pads.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <nav aria-label="Operations">
-          {(["Tickets", "Pull sheet", "Record run", "Setup"] as Screen[]).map(
-            (name) => (
-              <button
-                key={name}
-                className={screen === name ? "active" : ""}
-                aria-current={screen === name ? "page" : undefined}
-                onClick={() => {
-                  setScreen(name);
-                  setError("");
-                  setMessage("");
-                  setPull([]);
-                }}
-              >
-                {name}
-              </button>
-            ),
-          )}
+          {(
+            ["Tickets", "Pull sheet", "Record run", "Log", "Setup"] as Screen[]
+          ).map((name) => (
+            <button
+              key={name}
+              className={screen === name ? "active" : ""}
+              aria-current={screen === name ? "page" : undefined}
+              onClick={() => {
+                setScreen(name);
+                setError("");
+                setMessage("");
+                setPull([]);
+              }}
+            >
+              {name}
+            </button>
+          ))}
         </nav>
       </header>
       {error && (
@@ -105,16 +159,23 @@ export default function App() {
             : "Loading pad…"}
         </main>
       ) : screen === "Setup" ? (
-        <Setup pad={pad} onSave={save} />
+        <Setup key={pad.pad.id} pad={pad} onSave={save} onActivate={activate} />
+      ) : screen === "Log" ? (
+        <LedgerLog key={pad.pad.id} pad={pad} onSave={save} />
       ) : (
         <>
-          <main className="workspace">
+          <main className="workspace" key={pad.pad.id}>
             <Yard
               pad={pad}
               selected={selected}
               onSelect={select}
               multi={screen === "Record run" ? pull : []}
             />
+            {!pad.silos.length && (
+              <p className="empty empty-yard">
+                This pad has no silos. Add wells, meshes and silos in Setup.
+              </p>
+            )}
             <aside
               className={`rail ${screen === "Pad" ? "silo-rail" : "operation-rail"}`}
               aria-label={screen === "Pad" ? "Selected silo" : screen}

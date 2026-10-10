@@ -1,4 +1,8 @@
 import type { Pad } from "./types";
+let activePad = 1;
+export function setActivePad(id: number) {
+  activePad = id;
+}
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -11,9 +15,10 @@ export async function request<T = Pad>(
   path: string,
   body?: unknown,
   method = "POST",
+  padId = activePad,
 ): Promise<T> {
   const res = await fetch(
-    `/api/${path}`,
+    `/api/${path}?pad_id=${padId}`,
     body === undefined
       ? undefined
       : {

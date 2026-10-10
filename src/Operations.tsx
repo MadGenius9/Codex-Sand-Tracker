@@ -8,6 +8,12 @@ export function SiloRail({ pad, silo }: { pad: Pad; silo: Silo }) {
   return (
     <>
       <h1>Silo {String(silo.number).padStart(2, "0")}</h1>
+      {silo.name && <p className="muted">{silo.name}</p>}
+      <p className="muted">
+        {(silo.on_hand / pad.settings.pounds_per_ton).toFixed(1)} tons ·{" "}
+        {(silo.on_hand / pad.settings.pounds_per_truckload).toFixed(1)}{" "}
+        truckloads
+      </p>
       <div className="rail-tank">
         <Tank silo={silo} />
       </div>
@@ -58,7 +64,8 @@ export function Tickets({
   silo: Silo;
   onSave: Save;
 }) {
-  const [supplier, setSupplier] = useState("");
+  const [supplier, setSupplier] = useState(pad.suppliers[0]?.name ?? "__new");
+  const [newSupplier, setNewSupplier] = useState("");
   const [ticket, setTicket] = useState("");
   const [product, setProduct] = useState("");
   const [weight, setWeight] = useState("");
@@ -67,6 +74,12 @@ export function Tickets({
   const [duplicate, setDuplicate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [serverDuplicate, setServerDuplicate] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const mapping = pad.product_map.find(
+    (m) => m.product_code.toLowerCase() === product.trim().toLowerCase(),
+  );
+  const ticketMesh = mapping?.sand_type_id ?? silo.sand_type_id;
+  const mismatch = ticketMesh !== silo.sand_type_id;
   const exists =
     serverDuplicate ||
     pad.deliveries.some(
@@ -78,13 +91,14 @@ export function Tickets({
     setBusy(true);
     try {
       const result = await request("deliveries", {
-        supplier,
+        supplier: supplier === "__new" ? newSupplier : supplier,
         ticket_number: ticket,
         product_code: product,
         pounds: Number(weight),
         date,
         silo_id: silo.id,
-        sand_type_id: silo.sand_type_id,
+        sand_type_id: ticketMesh,
+        remember_product: remember,
         confirm_duplicate: duplicate,
       });
       onSave(
@@ -115,13 +129,31 @@ export function Tickets({
       <form onSubmit={save}>
         <label>
           Supplier
-          <input
+          <select
+            aria-label="Supplier"
             required
             value={supplier}
             onChange={(e) => setSupplier(e.target.value)}
-            maxLength={200}
-          />
+          >
+            {pad.suppliers.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+            <option value="__new">Add a new supplier…</option>
+          </select>
         </label>
+        {supplier === "__new" && (
+          <label>
+            New supplier
+            <input
+              required
+              maxLength={200}
+              value={newSupplier}
+              onChange={(e) => setNewSupplier(e.target.value)}
+            />
+          </label>
+        )}
         <label>
           Ticket number
           <input
@@ -150,13 +182,28 @@ export function Tickets({
         )}
         <label>
           Mesh
-          <select value={silo.sand_type_id} disabled>
+          <select aria-label="Mesh" value={ticketMesh} disabled>
             {pad.sand_types.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
             ))}
           </select>
+        </label>
+        {mapping && (
+          <p className={mismatch ? "error" : "muted"}>
+            {mismatch
+              ? "Mapped mesh does not match this silo. Select a tank assigned to the mapped mesh."
+              : "Mesh filled from mine code."}
+          </p>
+        )}
+        <label className="check-label">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />{" "}
+          Save this mine code for the next ticket
         </label>
         <label>
           Product code
@@ -193,10 +240,19 @@ export function Tickets({
             {error}
           </p>
         )}
-        <button className="primary" disabled={busy || (exists && !duplicate)}>
+        <button
+          className="primary"
+          disabled={busy || mismatch || (exists && !duplicate)}
+        >
           {busy ? "Saving…" : "Save delivery"}
         </button>
       </form>
+      <button
+        className="text-button"
+        onClick={() => setWeight(String(pad.settings.pounds_per_truckload))}
+      >
+        Use truckload · {pounds(pad.settings.pounds_per_truckload)} lb
+      </button>
       <h2 className="section-title">Today’s tickets</h2>
       <div className="table-wrap">
         <table>
@@ -222,7 +278,9 @@ export function Tickets({
                       }
                     </small>
                   </td>
-                  <td>{pad.silos.find((s) => s.id === d.silo_id)?.number}</td>
+                  <td>
+                    {pad.all_silos.find((s) => s.id === d.silo_id)?.number}
+                  </td>
                   <td>{pounds(d.pounds)}</td>
                 </tr>
               ))}
@@ -252,7 +310,7 @@ export function PullSheet({ pad }: { pad: Pad }) {
               <h2>{pad.next.well.name}</h2>
               <p>{pad.next.well.customer}</p>
               <strong>
-                Stage {pad.next.stage}{" "}
+                {pad.next.stage === 0 ? "Toe stage" : "Stage " + pad.next.stage}{" "}
                 <span className="muted">/ {pad.next.well.planned_stages}</span>
               </strong>
             </div>
@@ -342,17 +400,25 @@ export function RecordRun({
   const [weights, setWeights] = useState<Record<number, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [runDate, setRunDate] = useState(today());
   const [changes, setChanges] = useState<
     { silo_id: number; before: number; after: number }[]
   >([]);
-  const plan = pad.next?.plans.find((p) => p.sand_type_id === mesh);
+  const plan =
+    pad.next?.well.id === well && pad.next.stage === stage
+      ? pad.next.plans.find((p) => p.sand_type_id === mesh)
+      : undefined;
   const amount = (s: Silo) =>
     weights[s.id] ??
     String(
       plan?.pulls.find((p) => p.silo_id === s.id)?.pounds ??
         Math.min(
           s.on_hand,
-          pad.sand_types.find((m) => m.id === mesh)?.design_pounds ?? 0,
+          pad.wells
+            .find((w) => w.id === well)
+            ?.overrides.find((d) => d.sand_type_id === mesh)?.pounds ??
+            pad.sand_types.find((m) => m.id === mesh)?.design_pounds ??
+            0,
         ),
     );
   async function save(e: FormEvent) {
@@ -362,6 +428,7 @@ export function RecordRun({
     try {
       const r = await request<{ pad: Pad; changes: typeof changes }>("runs", {
         well_id: well,
+        date: runDate,
         stage,
         sand_type_id: mesh,
         entries: selected.map((id) => ({
@@ -387,10 +454,24 @@ export function RecordRun({
       <p className="muted">Click online tanks to build the pull.</p>
       <form onSubmit={save}>
         <label>
+          Run date
+          <input
+            required
+            type="date"
+            value={runDate}
+            onChange={(e) => setRunDate(e.target.value)}
+          />
+        </label>
+        <label>
           Well
           <select
             value={well}
-            onChange={(e) => setWell(Number(e.target.value))}
+            onChange={(e) => {
+              const w = pad.wells.find((w) => w.id === Number(e.target.value))!;
+              setWell(w.id);
+              setStage((w.toe_stage ?? pad.settings.toe_stage) ? 0 : 1);
+              setWeights({});
+            }}
           >
             {pad.wells.map((w) => (
               <option key={w.id} value={w.id}>
@@ -404,7 +485,12 @@ export function RecordRun({
             Stage
             <input
               type="number"
-              min="1"
+              min={
+                (pad.wells.find((w) => w.id === well)?.toe_stage ??
+                pad.settings.toe_stage)
+                  ? 0
+                  : 1
+              }
               max={pad.wells.find((w) => w.id === well)?.planned_stages}
               required
               value={stage}

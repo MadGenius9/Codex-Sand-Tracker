@@ -36,7 +36,8 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   await page.screenshot({ path: "qa/yard-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.getByRole("button", { name: /Silo 3,/ }).click();
-  await page.getByLabel("Supplier", { exact: true }).fill("QA Sand");
+  await page.getByLabel("Supplier", { exact: true }).selectOption("__new");
+  await page.getByLabel("New supplier", { exact: true }).fill("QA Sand");
   await page.getByLabel("Ticket number", { exact: true }).fill("SP-1048");
   await expect(
     page.getByText("This ticket number already exists."),
@@ -46,7 +47,7 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   ).toBeDisabled();
   await page.getByLabel("Ticket number", { exact: true }).fill("QA-001");
   await page.getByLabel("Pounds", { exact: true }).fill("10000");
-  await page.getByLabel("Product code").fill("100M");
+  await page.getByLabel("Product code", { exact: true }).fill("100M");
   await page.getByRole("button", { name: "Save delivery" }).click();
   await expect(page.getByRole("status")).toContainText("152,000");
   await expect(
@@ -75,21 +76,21 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("Reserve updated");
+  await expect(page.getByRole("status")).toContainText("Job settings saved");
   await page.getByRole("button", { name: "Edit silo 3", exact: true }).click();
   await page.getByLabel("Manual order pin", { exact: true }).fill("1");
   await page
-    .locator(".setup-form")
+    .locator(".setup-form:not(.pad-tools-form)")
     .getByRole("button", { name: "Save", exact: true })
     .click();
-  await expect(page.locator(".setup-form")).toHaveCount(0);
+  await expect(page.locator(".setup-form:not(.pad-tools-form)")).toHaveCount(0);
   await page.getByRole("button", { name: "Edit silo 4", exact: true }).click();
   await page.getByLabel("Manual order pin", { exact: true }).fill("1");
   await page
-    .locator(".setup-form")
+    .locator(".setup-form:not(.pad-tools-form)")
     .getByRole("button", { name: "Save", exact: true })
     .click();
-  await expect(page.locator(".setup-form")).toHaveCount(0);
+  await expect(page.locator(".setup-form:not(.pad-tools-form)")).toHaveCount(0);
   await page
     .getByRole("button", { name: "Sand Pad yard", exact: true })
     .click();

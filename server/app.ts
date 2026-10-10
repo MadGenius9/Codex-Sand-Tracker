@@ -1,6 +1,14 @@
 import express from "express";
 import type Database from "better-sqlite3";
 import { snapshot } from "./store";
+import { captureDesign } from "./migrate";
+import { jobRoutes, afterRun } from "./job";
+import {
+  ledgerRoutes,
+  rememberProduct,
+  validBalances,
+  date as validDate,
+} from "./ledger";
 const fail = (message: string, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -24,12 +32,24 @@ function str(value: unknown, name: string) {
 export function createApp(db: Database.Database) {
   const app = express();
   app.use(express.json({ limit: "64kb" }));
-  app.get("/api/pad", (_req, res) => res.json(snapshot(db)));
+  app.use("/api", (req, res, next) => {
+    try {
+      const id = req.query.pad_id === undefined ? 1 : Number(req.query.pad_id);
+      num(id, "Pad", 1, true);
+      if (!db.prepare("SELECT id FROM pads WHERE id=?").get(id))
+        fail("Pad not found.", 404);
+      res.locals.padId = id;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/pad", (_req, res) => res.json(snapshot(db, res.locals.padId)));
   app.post("/api/deliveries", (req, res) => {
     const b = req.body;
     const ticket = str(b.ticket_number, "Ticket number");
     const result = db.transaction(() => {
-      const pad = snapshot(db);
+      const pad = snapshot(db, res.locals.padId);
       const silo = pad.silos.find(
         (s) => s.id === num(b.silo_id, "Silo", 1, true),
       );
@@ -41,9 +61,9 @@ export function createApp(db: Database.Database) {
         fail("Delivery would exceed silo capacity.");
       const duplicate = db
         .prepare(
-          "SELECT id FROM deliveries WHERE ticket_number=? COLLATE NOCASE",
+          "SELECT id FROM deliveries WHERE pad_id=? AND ticket_number=? COLLATE NOCASE AND voided_at IS NULL",
         )
-        .get(ticket);
+        .get(res.locals.padId, ticket);
       if (duplicate && !b.confirm_duplicate)
         fail(
           "This ticket number already exists. Confirm the duplicate before saving.",
@@ -57,8 +77,9 @@ export function createApp(db: Database.Database) {
       )
         fail("Enter a valid delivery date.");
       db.prepare(
-        "INSERT INTO deliveries(date,ticket_number,supplier,product_code,sand_type_id,pounds,silo_id) VALUES(?,?,?,?,?,?,?)",
+        "INSERT INTO deliveries(pad_id,date,ticket_number,supplier,product_code,sand_type_id,pounds,silo_id) VALUES(?,?,?,?,?,?,?,?)",
       ).run(
+        res.locals.padId,
         date,
         ticket,
         str(b.supplier, "Supplier"),
@@ -67,17 +88,23 @@ export function createApp(db: Database.Database) {
         pounds,
         silo!.id,
       );
-      return snapshot(db);
+      db.prepare(
+        "INSERT INTO suppliers(pad_id,name) VALUES(?,?) ON CONFLICT(pad_id,name) DO NOTHING",
+      ).run(res.locals.padId, str(b.supplier, "Supplier"));
+      rememberProduct(db, res.locals.padId, b);
+      return snapshot(db, res.locals.padId);
     })();
     res.status(201).json(result);
   });
   app.post("/api/runs", (req, res) => {
     const result = db.transaction(() => {
       const b = req.body;
-      const pad = snapshot(db);
+      const pad = snapshot(db, res.locals.padId);
       const well = pad.wells.find((w) => w.id === b.well_id);
       if (!well) fail("Select a well.");
-      const stage = num(b.stage, "Stage", 1, true);
+      const stage = num(b.stage, "Stage", 0, true);
+      if (stage === 0 && !(well!.toe_stage ?? pad.settings.toe_stage))
+        fail("This well has no toe stage.");
       if (stage > well!.planned_stages)
         fail("Stage exceeds this well’s planned count.");
       const entries = Array.isArray(b.entries) ? b.entries : [];
@@ -85,6 +112,7 @@ export function createApp(db: Database.Database) {
         fail("Select at least one silo.");
       const ids = new Set<number>();
       const changes = [];
+      captureDesign(db, res.locals.padId, well!.id, stage);
       for (const entry of entries) {
         const silo = pad.silos.find((s) => s.id === entry.silo_id);
         if (!silo) fail("Silo not found.");
@@ -97,120 +125,29 @@ export function createApp(db: Database.Database) {
         if (pounds > silo!.on_hand)
           fail(`Silo ${silo!.number} does not have enough sand.`);
         db.prepare(
-          "INSERT INTO runs(well_id,stage,sand_type_id,pounds,silo_id) VALUES(?,?,?,?,?)",
-        ).run(well!.id, stage, b.sand_type_id, pounds, silo!.id);
+          "INSERT INTO runs(pad_id,date,well_id,stage,sand_type_id,pounds,silo_id) VALUES(?,?,?,?,?,?,?)",
+        ).run(
+          res.locals.padId,
+          validDate(b.date ?? new Date().toLocaleDateString("en-CA")),
+          well!.id,
+          stage,
+          b.sand_type_id,
+          pounds,
+          silo!.id,
+        );
         changes.push({
           silo_id: silo!.id,
           before: silo!.on_hand,
           after: silo!.on_hand - pounds,
         });
       }
-      return { pad: snapshot(db), changes };
+      afterRun(db, res.locals.padId, well!.id, stage);
+      return { pad: snapshot(db, res.locals.padId), changes };
     })();
     res.status(201).json(result);
   });
-  app.put("/api/settings", (req, res) => {
-    const reserve = num(req.body.reserve, "Stage reserve");
-    if (req.body.strategy !== "sequential")
-      fail("Only sequential rotation is supported.");
-    db.prepare("UPDATE settings SET reserve=?,strategy=? WHERE id=1").run(
-      reserve,
-      "sequential",
-    );
-    res.json(snapshot(db));
-  });
-  app.post("/api/setup/:entity", (req, res) => {
-    const result = db.transaction(() => {
-      const b = req.body;
-      const entity = req.params.entity;
-      const id = b.id === undefined ? null : num(b.id, "ID", 1, true);
-      if (!["wells", "sand_types", "silos"].includes(entity))
-        fail("Unknown setup entity.", 404);
-      if (id && !db.prepare(`SELECT id FROM ${entity} WHERE id=?`).get(id))
-        fail("Record not found.", 404);
-      let values: unknown[];
-      let fields: string[];
-      if (entity === "wells") {
-        fields = ["name", "customer", "planned_stages"];
-        values = [
-          str(b.name, "Well name"),
-          str(b.customer, "Customer"),
-          num(b.planned_stages, "Planned stages", 1, true),
-        ];
-        if (id) {
-          const max =
-            (
-              db
-                .prepare("SELECT MAX(stage) AS stage FROM runs WHERE well_id=?")
-                .get(id) as { stage: number }
-            ).stage ?? 0;
-          if (Number(values[2]) < max)
-            fail("Planned count cannot exclude recorded stages.");
-        }
-      } else if (entity === "sand_types") {
-        fields = ["name", "design_pounds"];
-        values = [
-          str(b.name, "Sand name"),
-          num(b.design_pounds, "Design pounds", 1),
-        ];
-      } else {
-        const pad = snapshot(db);
-        const old = pad.silos.find((s) => s.id === id);
-        const mesh = num(b.sand_type_id, "Mesh", 1, true);
-        if (!pad.sand_types.some((s) => s.id === mesh))
-          fail("Select a valid mesh.");
-        if (b.side !== "A" && b.side !== "B") fail("Side must be A or B.");
-        const capacity = num(b.capacity, "Capacity", 1);
-        const start = num(b.starting_balance, "Starting balance");
-        if (
-          old &&
-          old.sand_type_id !== mesh &&
-          (pad.deliveries.some((d) => d.silo_id === id) ||
-            pad.runs.some((r) => r.silo_id === id))
-        )
-          fail(
-            "A silo with history cannot change mesh. Add a new silo for a different mesh.",
-          );
-        const balance = old
-          ? old.on_hand - old.starting_balance + start
-          : start;
-        if (balance < 0 || balance > capacity)
-          fail(
-            "Starting balance and capacity must contain the computed on-hand.",
-          );
-        fields = [
-          "number",
-          "side",
-          "sand_type_id",
-          "capacity",
-          "starting_balance",
-          "manual_pin",
-          "offline",
-        ];
-        values = [
-          num(b.number, "Silo number", 1, true),
-          b.side,
-          mesh,
-          capacity,
-          start,
-          b.manual_pin === null || b.manual_pin === ""
-            ? null
-            : num(b.manual_pin, "Manual pin", 1, true),
-          b.offline ? 1 : 0,
-        ];
-      }
-      if (id)
-        db.prepare(
-          `UPDATE ${entity} SET ${fields.map((f) => `${f}=?`).join(",")} WHERE id=?`,
-        ).run(...values, id);
-      else
-        db.prepare(
-          `INSERT INTO ${entity}(${fields.join(",")}) VALUES(${fields.map(() => "?").join(",")})`,
-        ).run(...values);
-      return snapshot(db);
-    })();
-    res.json(result);
-  });
+  jobRoutes(app, db);
+  ledgerRoutes(app, db);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "API route not found." }),
   );

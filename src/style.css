@@ -843,3 +843,190 @@ tfoot td {
     break-inside: avoid;
   }
 }
+
+/* Additional operations reuse the existing yard and setup styles. */
+.pad-selector {
+  width: 180px;
+  margin: 0 0 0 auto;
+}
+.pad-selector select {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.check-label {
+  flex-direction: row;
+  align-items: center;
+  line-height: 1.5;
+}
+.check-label input {
+  flex-shrink: 0;
+}
+.setup-section > .muted,
+.ledger-screen > .muted {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 12px 0 18px;
+}
+.setup-section .primary {
+  margin-top: 10px;
+}
+.setup-form .check-label {
+  flex: 2;
+  max-width: 380px;
+}
+.setup-form > .primary {
+  align-self: flex-end;
+  margin-top: 0;
+}
+.log-filters {
+  display: flex;
+  gap: 18px;
+  margin: 24px 0 10px;
+  flex-wrap: wrap;
+}
+.log-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  width: 200px;
+}
+.ledger-layout:has(.ledger-editor) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 32px;
+  align-items: start;
+}
+.ledger-screen th,
+.ledger-screen td {
+  padding: 13px 9px;
+}
+.ledger-screen th:first-child,
+.ledger-screen td:first-child {
+  padding-left: 0;
+}
+.ledger-editor {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+}
+.ledger-editor h2 {
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+.ledger-editor .muted {
+  font-size: 12px;
+  margin: 10px 0 16px;
+}
+.void-action {
+  margin: 22px 0;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.void-action .text-button {
+  margin-right: 18px;
+}
+.voided {
+  opacity: 0.6;
+}
+.history-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.history-filter select {
+  width: 190px;
+}
+.empty-yard {
+  position: absolute;
+  top: 150px;
+  left: 32px;
+}
+@media (max-width: 1000px) {
+  nav {
+    gap: 18px;
+  }
+  .pad-selector {
+    width: 140px;
+  }
+  .ledger-layout:has(.ledger-editor) {
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  .ledger-layout .table-wrap {
+    width: 100%;
+  }
+  .ledger-editor {
+    border-left: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 600px;
+  }
+}
+@media (max-width: 800px) {
+  .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 140px;
+    gap: 12px;
+  }
+  .app-header nav {
+    grid-column: 1 / -1;
+    gap: 8px;
+  }
+  .pad-selector {
+    width: 140px;
+  }
+  .history-filter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .history-filter select {
+    width: 140px;
+  }
+}
+@media print {
+  .ledger-screen,
+  .setup {
+    display: none;
+  }
+}
+fieldset.well-overrides {
+  grid-column: 1 / -1;
+  border: 1px solid #34383f;
+  padding: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.well-overrides legend {
+  color: #a9adb3;
+  padding: 0 8px;
+}
+.settings-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  align-items: end;
+}
+.settings-form label:first-child {
+  max-width: none;
+}
+.settings-form label:nth-child(2) {
+  min-width: 0;
+}
+.settings-form .check-label {
+  align-self: center;
+}
+.settings-form .primary {
+  justify-self: start;
+}
+.well-overrides {
+  width: 100%;
+  min-width: 0;
+}
+.setup-section td .text-button + .text-button {
+  margin-left: 12px;
+}
