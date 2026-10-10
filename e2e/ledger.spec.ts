@@ -41,7 +41,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
   });
   await page.goto("http://127.0.0.1:5181/");
   await expect(page).toHaveTitle("Sand Pad");
-  await expect(page.getByRole("button", { name: /Silo \d/ })).toHaveCount(12);
+  await expect(page.getByRole("button", { name: /Silo \d/ })).toHaveCount(6);
   await page.screenshot({
     path: join(artifacts, "sand-pad-desktop.png"),
     fullPage: true,
@@ -60,7 +60,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
   await expect(
     page.getByRole("button", { name: "Save delivery" }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: /Silo 8,/ }).click();
+  await page.getByRole("button", { name: /Silo 5,/ }).click();
   await page.getByLabel("Ticket number", { exact: true }).fill("LEDGER-001");
   await page.getByLabel("Pounds", { exact: true }).fill("5000");
   await page.getByRole("button", { name: "Save delivery" }).click();
@@ -76,7 +76,7 @@ test("edits and voids update yard; log, pads, stage history, mappings and downlo
   await page
     .getByRole("button", { name: "Sand Pad yard", exact: true })
     .click();
-  await page.getByRole("button", { name: /Silo 8,/ }).click();
+  await page.getByRole("button", { name: /Silo 5,/ }).click();
   await expect(page.locator(".readings").first()).toContainText("178,000");
   await page.getByRole("button", { name: "Log", exact: true }).click();
   await page.getByLabel("From date").fill("2026-10-08");

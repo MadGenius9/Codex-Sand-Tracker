@@ -77,6 +77,10 @@ export function jobRoutes(app: Express, db: Database.Database) {
         fail("Unknown setup entity.", 404);
       const id = b.id === undefined ? null : num(b.id, "ID", 1, true);
       const old = snapshot(db, padId);
+      if (entity === "silos" && id === null && old.silos.length >= 6)
+        fail(
+          "A pad can have at most 6 active silos. Remove a silo before adding another.",
+        );
       const stored = id
         ? (db
             .prepare(`SELECT * FROM ${entity} WHERE id=? AND pad_id=?`)

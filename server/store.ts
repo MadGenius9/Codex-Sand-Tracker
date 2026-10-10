@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type { Well, Sand, Silo, Delivery, Run, Pad, Plan } from "../src/types";
 import { migrate } from "./migrate";
 import { migrateJob } from "./job-migrate";
+import { reduceOriginalDemo } from "./demo";
 
 export function openStore(file: string, seed = true) {
   if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true });
@@ -37,10 +38,10 @@ export function openStore(file: string, seed = true) {
       );
       db.prepare("INSERT INTO sand_types VALUES(1,?,?)").run("100 mesh", 80000);
       db.prepare("INSERT INTO sand_types VALUES(2,?,?)").run("40/70", 60000);
-      for (let i = 1; i <= 12; i++)
+      for (const i of [1, 2, 3, 7, 8, 12])
         db.prepare("INSERT INTO silos VALUES(?,?,?,?,?,?,?,?)").run(
           i,
-          i,
+          [1, 2, 3, 7, 8, 12].indexOf(i) + 1,
           i <= 6 ? "A" : "B",
           i <= 6 ? 1 : 2,
           250000,
@@ -75,6 +76,7 @@ export function openStore(file: string, seed = true) {
     })();
   migrate(db, freshDemo);
   migrateJob(db);
+  reduceOriginalDemo(db);
   return db;
 }
 
@@ -218,18 +220,11 @@ export function snapshot(db: Database.Database, padId = 1): Pad {
     if (settings.strategy === "fullest")
       strategyOrder = [...rotated].sort((a, b) => b.percent - a.percent);
     if (settings.strategy === "pairs") {
-      const paired: number[] = [];
-      for (const position of [6, 2, 5, 1, 4, 3])
-        for (const side of ["A", "B"]) {
-          const s = silos
-            .filter((s) => s.side === side)
-            .sort((a, b) => a.number - b.number)[position - 1];
-          if (s) paired.push(s.id);
-        }
+      const positions = [6, 2, 5, 1, 4, 3];
+      const yard = [...silos].sort((a, b) => a.number - b.number);
+      const ids = positions.map((n) => yard[n - 1]?.id);
       strategyOrder = [...online].sort(
-        (a, b) =>
-          (paired.indexOf(a.id) < 0 ? 999 : paired.indexOf(a.id)) -
-          (paired.indexOf(b.id) < 0 ? 999 : paired.indexOf(b.id)),
+        (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id),
       );
     }
     const order = strategyOrder

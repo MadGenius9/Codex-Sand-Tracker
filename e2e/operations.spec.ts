@@ -31,7 +31,7 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("http://127.0.0.1:5180");
-  await expect(page.getByRole("button", { name: /Silo \d/ })).toHaveCount(12);
+  await expect(page.getByRole("button", { name: /Silo \d/ })).toHaveCount(6);
   await expect(page.getByRole("heading", { name: "Silo 03" })).toBeVisible();
   await page.screenshot({ path: "qa/yard-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
@@ -66,8 +66,8 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
   await page.getByRole("button", { name: "Save run", exact: true }).click();
   await expect(page.locator(".run-result")).toContainText("162,000 → 82,000");
   await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("2");
-  await page.getByRole("button", { name: /Silo 8,/ }).click();
-  await page.getByLabel("Pounds from silo 8").fill("60000");
+  await page.getByRole("button", { name: /Silo 5,/ }).click();
+  await page.getByLabel("Pounds from silo 5").fill("60000");
   await page.getByRole("button", { name: "Save run", exact: true }).click();
   await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("3");
   await expect(page.locator(".run-result")).toContainText("175,000 → 115,000");
@@ -84,7 +84,7 @@ test("yard, tickets, partial runs, next stage, setup, print and mobile", async (
     .getByRole("button", { name: "Save", exact: true })
     .click();
   await expect(page.locator(".setup-form:not(.pad-tools-form)")).toHaveCount(0);
-  await page.getByRole("button", { name: "Edit silo 4", exact: true }).click();
+  await page.getByRole("button", { name: "Edit silo 2", exact: true }).click();
   await page.getByLabel("Manual order pin", { exact: true }).fill("1");
   await page
     .locator(".setup-form:not(.pad-tools-form)")

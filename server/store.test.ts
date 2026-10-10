@@ -10,18 +10,18 @@ test("ledger balances, rotation, pins, offline reserve and stage completion", ()
   const db = openStore(":memory:");
   try {
     let p = snapshot(db);
-    assert.equal(p.silos.length, 12);
+    assert.equal(p.silos.length, 6);
     assert.equal(p.silos[0].on_hand, 152000);
     assert.equal(p.next?.stage, 2);
     assert.equal(p.next?.plans[0].pulls[0].silo_id, 2);
     assert.equal(p.next?.plans[1].pulls[0].silo_id, 8);
-    assert.equal(p.silos[11].run_order, null);
-    db.prepare("UPDATE silos SET manual_pin=1 WHERE id IN (3,4)").run();
+    assert.equal(p.silos[5].run_order, null);
+    db.prepare("UPDATE silos SET manual_pin=1 WHERE id IN (2,3)").run();
     p = snapshot(db);
     assert.ok(p.silos[2].pin_conflict);
-    assert.ok(p.silos[3].pin_conflict);
-    assert.equal(p.next?.plans[0].pulls[0].silo_id, 3);
-    db.prepare("UPDATE silos SET offline=1 WHERE id=4").run();
+    assert.ok(p.silos[1].pin_conflict);
+    assert.equal(p.next?.plans[0].pulls[0].silo_id, 2);
+    db.prepare("UPDATE silos SET offline=1 WHERE id=2").run();
     assert.equal(snapshot(db).silos[2].pin_conflict, false);
     db.prepare(
       "INSERT INTO runs(pad_id,well_id,stage,sand_type_id,pounds,silo_id) VALUES(1,1,2,1,40000,3)",

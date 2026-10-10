@@ -137,8 +137,8 @@ test("real job settings, toe/overrides, completed-stage options, suppliers, remo
     assert.equal(r.status, 409);
     r = await send("setup/silos/2", { confirm_history: true }, "DELETE");
     assert.equal(r.status, 200);
-    assert.equal(r.data.silos.length, 11);
-    assert.equal(r.data.all_silos.length, 12);
+    assert.equal(r.data.silos.length, 5);
+    assert.equal(r.data.all_silos.length, 6);
     assert.equal(r.data.ledger.runs.length, ledgerCount);
     assert.equal(r.data.all_silos[1].name, "North tank");
     r = await send("setup/wells/1", {}, "DELETE");
@@ -154,7 +154,7 @@ test("real job settings, toe/overrides, completed-stage options, suppliers, remo
     assert.equal(r.data.ledger.runs.length, 0);
     assert.equal(r.data.suppliers.length, 3);
     assert.equal(r.data.product_map.length, 1);
-    assert.equal(r.data.silos.length, 11);
+    assert.equal(r.data.silos.length, 5);
     assert.ok(r.data.silos.every((s: any) => s.on_hand === 0));
     assert.equal(snapshot(db).ledger.runs.length, ledgerCount);
     assert.deepEqual(db.pragma("foreign_key_check"), []);
@@ -176,22 +176,96 @@ test("all six draw strategies honor pins and exclude offline/removed tanks", () 
     const choose = (s: string) =>
       db.prepare("UPDATE settings SET strategy=?").run(s);
     choose("sequential");
-    assert.deepEqual(order(), [2, 3, 4, 5, 6, 1]);
+    assert.deepEqual(order(), [2, 3, 1]);
     choose("emptiest");
-    assert.deepEqual(order(), [6, 5, 4, 3, 1, 2]);
+    assert.deepEqual(order(), [3, 1, 2]);
     choose("fullest");
-    assert.deepEqual(order(), [2, 1, 3, 4, 5, 6]);
+    assert.deepEqual(order(), [2, 1, 3]);
     choose("least_used");
-    assert.deepEqual(order(), [2, 3, 4, 5, 6, 1]);
+    assert.deepEqual(order(), [2, 3, 1]);
     db.prepare("UPDATE silos SET starting_balance=250000 WHERE id=2").run();
     choose("partials");
-    assert.deepEqual(order(), [3, 4, 5, 6, 1, 2]);
+    assert.deepEqual(order(), [3, 1, 2]);
     choose("pairs");
-    assert.deepEqual(order(), [6, 2, 5, 1, 4, 3]);
+    assert.deepEqual(order(), [2, 1, 3]);
     db.prepare("UPDATE silos SET manual_pin=1 WHERE id=3").run();
     assert.equal(order()[0], 3);
     db.prepare("UPDATE silos SET offline=1 WHERE id=3").run();
     assert.ok(!order().includes(3));
+  } finally {
+    db.close();
+  }
+});
+test("six active silos is enforced per pad; retiring one frees a slot without deleting history", async () => {
+  const db = openStore(":memory:"),
+    server = createApp(db).listen(0, "127.0.0.1");
+  await new Promise<void>((r) => server.once("listening", r));
+  const a = server.address() as { port: number };
+  const send = async (path: string, body: unknown, method = "POST") => {
+    const r = await fetch("http://127.0.0.1:" + a.port + "/api/" + path, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return { status: r.status, data: await r.json() };
+  };
+  try {
+    const { id, ...silo } = snapshot(db).silos[0];
+    const candidate = { ...silo, number: 99, starting_balance: 0 };
+    let r = await send("setup/silos", candidate);
+    assert.equal(r.status, 400);
+    assert.match(r.data.error, /at most 6/);
+    assert.equal(snapshot(db).silos.length, 6);
+    r = await send("setup/silos", { ...silo, id, name: "Edited at limit" });
+    assert.equal(r.status, 200);
+    const before = snapshot(db);
+    r = await send("setup/silos/" + id, { confirm_history: true }, "DELETE");
+    assert.equal(r.status, 200);
+    assert.equal(r.data.silos.length, 5);
+    assert.equal(
+      r.data.ledger.deliveries.length,
+      before.ledger.deliveries.length,
+    );
+    r = await send("setup/silos", candidate);
+    assert.equal(r.status, 200);
+    assert.equal(r.data.silos.length, 6);
+    assert.equal(r.data.all_silos.length, 7);
+    r = await send("setup/silos", { ...candidate, number: 100 });
+    assert.equal(r.status, 400);
+    assert.deepEqual(db.pragma("foreign_key_check"), []);
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+    db.close();
+  }
+});
+test("reducing the original sample retires excess tanks and preserves ledger; configured pads are untouched", async () => {
+  const { reduceOriginalDemo } = await import("./demo");
+  const db = openStore(":memory:");
+  try {
+    db.prepare("UPDATE silos SET number=id WHERE id IN (7,8,12)").run();
+    const balances = [
+      184000, 162000, 142000, 118000, 80000, 24000, 196000, 175000, 153000,
+      132000, 104000, 52000,
+    ];
+    for (const id of [4, 5, 6, 9, 10, 11])
+      db.prepare(
+        "INSERT INTO silos(id,pad_id,number,side,sand_type_id,capacity,starting_balance,offline) VALUES(?,1,?,?,?,250000,?,0)",
+      ).run(id, id, id <= 6 ? "A" : "B", id <= 6 ? 1 : 2, balances[id - 1]);
+    const before = snapshot(db);
+    db.prepare("UPDATE pads SET name='Configured job' WHERE id=1").run();
+    reduceOriginalDemo(db);
+    assert.equal(snapshot(db).silos.length, 12);
+    db.prepare("UPDATE pads SET name='Demo pad' WHERE id=1").run();
+    reduceOriginalDemo(db);
+    const after = snapshot(db);
+    assert.equal(after.silos.length, 6);
+    assert.equal(after.all_silos.length, 12);
+    assert.deepEqual(after.ledger, before.ledger);
+    for (const s of after.silos)
+      assert.equal(s.on_hand, before.silos.find((b) => b.id === s.id)!.on_hand);
+    reduceOriginalDemo(db);
+    assert.equal(snapshot(db).silos.length, 6);
+    assert.deepEqual(db.pragma("foreign_key_check"), []);
   } finally {
     db.close();
   }

@@ -171,6 +171,10 @@ export function ledgerRoutes(app: Express, db: Database.Database) {
       if (req.body.copy_setup === true) {
         const p = snapshot(db, source),
           meshes = new Map<number, number>();
+        if (p.silos.length > 6)
+          fail(
+            "The source pad has more than 6 active silos. Remove excess silos before copying setup.",
+          );
         for (const m of p.sand_types)
           meshes.set(
             m.id,

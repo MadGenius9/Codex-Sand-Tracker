@@ -131,6 +131,7 @@ function Editor({
         </h2>
         <button
           className="text-button"
+          disabled={entity === "silos" && pad.silos.length >= 6}
           onClick={() => {
             setEdit(defaults);
             setError("");
@@ -144,6 +145,12 @@ function Editor({
               : "silo"}
         </button>
       </div>
+      {entity === "silos" && (
+        <p className="muted">
+          {pad.silos.length} / 6 active silos · Remove a silo to free a slot.
+          Ledger history is retained.
+        </p>
+      )}
       {entity === "sand_types" && (
         <div className="table-wrap">
           <table>

@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:5173. One command runs Vite and the Express API at `127.0.0.1:3001`. The first API startup creates `data/sand-pad.sqlite` with a demo pad: 12 silos, two sides, two meshes, two wells, two tickets and two runs. Subsequent starts preserve the ledger. No external credentials or services are required. IBM Plex fonts are bundled locally.
+Open http://localhost:5173. One command runs Vite and the Express API at `127.0.0.1:3001`. The first API startup creates `data/sand-pad.sqlite` with a demo pad: 6 silos, two sides, two meshes, two wells, two tickets and two runs. Subsequent starts preserve the ledger. No external credentials or services are required. IBM Plex fonts are bundled locally.
 
 ```sh
 npm test
@@ -52,6 +52,8 @@ The browser test starts its own temporary API with an in-memory database, so it 
 
 Pad identity stores customer, pounds per ton (2000), pounds per truckload (57000), reserve (5), draw strategy and stage options. Wells can inherit or override the pad toe option; toe is stage 0 and adds one designed stage. Each well can override mesh pounds per stage, including zero for a mesh not used on that well. Job design compares planned pounds (including toe and well overrides), whole-job design totals, and active pumped pounds. Completed stage design snapshots remain fixed after later setup edits.
 
-Available strategies are sequential rotation, partials then rotation, least cumulative pounds used, emptiest percent first, fullest percent first, and paired Side A/B positions 6, 2, 5, 1, then 4, 3. Manual pins precede any strategy. Clear-pins applies only once all meshes meet the captured stage design. Turning auto-advance off holds the last recorded well/stage and exposes a current-stage selector in Setup.
+Available strategies are sequential rotation, partials then rotation, least cumulative pounds used, emptiest percent first, fullest percent first, and six silo positions 6, 2, 5, 1, then 4, 3. Manual pins precede any strategy. Clear-pins applies only once all meshes meet the captured stage design. Turning auto-advance off holds the last recorded well/stage and exposes a current-stage selector in Setup.
 
 Removing a well or silo retires it from the active job. Removal with any ledger history requires confirmation, and ledger rows, names and stage history remain available in Log. Silo numbers stay reserved by retired silos so historical identities remain unambiguous. Supplier choices are saved per pad; a new supplier can be added during ticket entry. Mine codes map directly to mesh independently of supplier.
+
+Pads allow at most six active silos, including offline silos. Setup disables Add silo at the limit and the API enforces it. Retiring a silo frees a slot without removing ledger rows. Existing job equipment is preserved; an older pad above the limit must retire excess silos before copying setup. The unchanged original demo is reduced to six active silos while retaining retired equipment and its history.
